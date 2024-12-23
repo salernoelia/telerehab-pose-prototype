@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pose Estimation Client</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+      }
+      video,
+      canvas {
+        border: 1px solid black;
+        width: 480px;
+        height: 360px;
+      }
+      #coordinates {
+        margin-top: 20px;
+        text-align: left;
+        display: inline-block;
+        max-height: 360px;
+        overflow-y: scroll;
+        width: 480px;
+        border: 1px solid #ccc;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Pose Estimation Client</h1>
+    <video id="video" autoplay muted></video>
+    <canvas id="canvas" width="480" height="360" style="display: none"></canvas>
+    <div id="coordinates">
+      <h2>Pose Coordinates</h2>
+      <pre id="coords"></pre>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
