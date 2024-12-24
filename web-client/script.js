@@ -60,7 +60,7 @@ video.addEventListener("play", () => {
       0.7
     );
 
-    setTimeout(sendFrame, 100);
+    setTimeout(sendFrame, 25);
   };
 
   sendFrame();

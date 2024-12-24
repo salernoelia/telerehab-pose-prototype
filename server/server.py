@@ -1,5 +1,3 @@
-# server.py
-
 import asyncio
 import json
 import cv2
@@ -10,16 +8,17 @@ import mediapipe as mp
 
 app = FastAPI()
 
-# cors is configured for local development
+# CORS configuration for local development
 origins = [
     "http://localhost:5500",
+    "http://localhost:5501",
     "http://127.0.0.1:5500",
-    # more origins
+    # Add more origins as needed
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,  # Adjust as necessary
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,11 +44,18 @@ class ConnectionManager:
         print(f"Client connected: {websocket.client}")
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-        print(f"Client disconnected: {websocket.client}")
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            print(f"Client disconnected: {websocket.client}")
 
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
+    async def broadcast(self, message: str):
+        """Send a message to all connected clients."""
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                print(f"Error sending to client: {e}")
+                self.disconnect(connection)
 
 manager = ConnectionManager()
 
@@ -58,34 +64,58 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # Receive bytes data (image frame)
-            data = await websocket.receive_bytes()
-            # Decode the image
-            nparr = np.frombuffer(data, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if img is None:
-                print("Failed to decode image")
-                continue
+            try:
+                # Handle text messages (e.g., "ping")
+                data = await websocket.receive_text()
+                if data == "ping":
+                    # Respond with a "pong" message
+                    response = json.dumps({"message": "pong"})
+                    await manager.broadcast(response)
+                    print("Pong broadcasted")
+                else:
+                    print(f"Received unexpected text message: {data}")
+            except WebSocketDisconnect:
+                manager.disconnect(websocket)
+                break
+            except Exception:
+                # Handle binary data (image frames)
+                try:
+                    data = await websocket.receive_bytes()
+                    # Decode the image
+                    nparr = np.frombuffer(data, np.uint8)
+                    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if img is None:
+                        print("Failed to decode image")
+                        continue
 
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            results = pose.process(img_rgb)
+                    # Convert to RGB for MediaPipe
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    results = pose.process(img_rgb)
 
-            if results.pose_landmarks:
-                landmarks = []
-                for landmark in results.pose_landmarks.landmark:
-                    landmarks.append({
-                        "x": landmark.x,
-                        "y": landmark.y,
-                        "z": landmark.z,
-                        "visibility": landmark.visibility
-                    })
-                # Send landmarks as JSON
-                await manager.send_personal_message(json.dumps({"landmarks": landmarks}), websocket)
-            else:
-                # Send empty landmarks
-                await manager.send_personal_message(json.dumps({"landmarks": []}), websocket)
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+                    if results.pose_landmarks:
+                        landmarks = []
+                        for landmark in results.pose_landmarks.landmark:
+                            landmarks.append({
+                                "x": landmark.x,
+                                "y": landmark.y,
+                                "z": landmark.z,
+                                "visibility": landmark.visibility
+                            })
+                        # Send landmarks to all clients
+                        response = json.dumps({"landmarks": landmarks})
+                        await manager.broadcast(response)
+                    else:
+                        # Send empty landmarks to all clients
+                        response = json.dumps({"landmarks": []})
+                        await manager.broadcast(response)
+                        print("Empty landmarks broadcasted")
+                except WebSocketDisconnect:
+                    manager.disconnect(websocket)
+                    break
+                except Exception as e_inner:
+                    print(f"Error processing message: {e_inner}")
+                    manager.disconnect(websocket)
+                    break
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Unexpected error: {e}")
         manager.disconnect(websocket)
