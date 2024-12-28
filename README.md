@@ -1,6 +1,6 @@
 # Telerehab Prototype
 
-A Python-based WebSocket server using FastAPI to process real-time video frames from a client, estimate human poses using MediaPipe, and send back pose landmark data. This project is designed to offload computational tasks from the client to the server.
+A Python-based WebSocket server using FastAPI to process real-time video frames from a client, estimate human poses using MediaPipe, and send back pose landmark data. This project is designed to offload computational tasks from the client to the server and broadcast it to a Godot instance.
 
 ---
 
